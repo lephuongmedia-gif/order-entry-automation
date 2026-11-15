@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Nhập đơn hàng</title>
+<style>
+  body{font-family:Arial,sans-serif;margin:0;background:#f4f6f8;color:#222}
+  header{background:#1f4e79;color:#fff;padding:14px 24px}
+  main{max-width:1100px;margin:20px auto;padding:0 16px;display:grid;gap:20px}
+  section{background:#fff;border-radius:8px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  h2{margin-top:0;font-size:18px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  label{display:block;font-size:13px;font-weight:bold;margin-bottom:4px}
+  input[type=text],input[type=number],select,textarea{width:100%;box-sizing:border-box;padding:8px;border:1px solid #bbb;border-radius:4px}
+  .err{color:#c0392b;font-size:12px;min-height:14px}
+  .invalid{border-color:#c0392b!important}
+  button{padding:8px 16px;border:0;border-radius:4px;cursor:pointer;background:#1f4e79;color:#fff}
+  button.secondary{background:#7f8c8d} button.danger{background:#c0392b}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{border-bottom:1px solid #e1e1e1;padding:8px;text-align:left}
+  #msg{padding:10px;border-radius:4px;margin-bottom:12px;display:none}
+  #msg.ok{display:block;background:#d4edda;color:#155724}
+  .toolbar{display:flex;gap:12px;margin-bottom:12px}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center}
+  .modal.open{display:flex}
+  .modal div{background:#fff;padding:24px;border-radius:8px;min-width:320px}
+</style>
+</head>
+<body>
+<header><h1 style="margin:0;font-size:20px">Hệ thống nhập đơn hàng</h1></header>
+<main>
+  <section>
+    <h2 id="form-title">Tạo đơn hàng mới</h2>
+    <div id="msg" role="alert"></div>
+    <div class="row">
+      <div><label for="customer-name">Tên khách hàng *</label>
+        <input type="text" id="customer-name" maxlength="60"><div class="err" id="err-customer-name"></div></div>
+      <div><label for="phone">Số điện thoại *</label>
+        <input type="text" id="phone" maxlength="15"><div class="err" id="err-phone"></div></div>
+      <div><label for="email">Email</label>
+        <input type="text" id="email"><div class="err" id="err-email"></div></div>
+      <div><label for="product">Sản phẩm *</label>
+        <select id="product">
+          <option value="">-- Chọn sản phẩm --</option>
+          <option value="Chuột không dây" data-price="150000">Chuột không dây</option>
+          <option value="Bàn phím cơ" data-price="450000">Bàn phím cơ</option>
+          <option value="Tai nghe" data-price="800000">Tai nghe</option>
+          <option value="Màn hình 24 inch" data-price="3500000">Màn hình 24 inch</option>
+        </select><div class="err" id="err-product"></div></div>
+      <div><label for="unit-price">Đơn giá</label>
+        <input type="text" id="unit-price" readonly value="0 ₫"></div>
+      <div><label for="quantity">Số lượng *</label>
+        <input type="number" id="quantity" value="1"><div class="err" id="err-quantity"></div></div>
+      <div style="grid-column:1/3"><label for="address">Địa chỉ giao hàng *</label>
+        <input type="text" id="address" maxlength="220"><div class="err" id="err-address"></div></div>
+      <div><label>Thanh toán</label>
+        <label style="font-weight:normal"><input type="radio" name="payment" value="COD" id="pay-cod" checked> Thanh toán khi nhận hàng (COD)</label>
+        <label style="font-weight:normal"><input type="radio" name="payment" value="Chuyển khoản" id="pay-bank"> Chuyển khoản</label></div>
+      <div><label for="note">Ghi chú</label>
+        <textarea id="note" rows="2" maxlength="200"></textarea></div>
+    </div>
+    <p style="font-size:16px"><b>Tổng tiền: <span id="total">0 ₫</span></b></p>
+    <button id="btn-submit">Tạo đơn hàng</button>
+    <button id="btn-reset" class="secondary">Làm mới</button>
+    <button id="btn-cancel-edit" class="secondary" style="display:none">Hủy sửa</button>
+  </section>
+
+  <section>
+    <h2>Danh sách đơn hàng (<span id="order-count">0</span>)</h2>
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="Tìm theo mã đơn, tên, SĐT">
+      <select id="filter-status" style="max-width:200px">
+        <option value="">Tất cả trạng thái</option>
+        <option value="Mới">Mới</option>
+        <option value="Đang giao">Đang giao</option>
+        <option value="Hoàn thành">Hoàn thành</option>
+      </select>
+    </div>
+    <table id="order-table">
+      <thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>SĐT</th><th>Sản phẩm</th><th>SL</th><th>Tổng tiền</th><th>Thanh toán</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p id="empty-msg">Chưa có đơn hàng</p>
+  </section>
+</main>
+
+<div class="modal" id="confirm-modal"><div>
+  <p id="confirm-text">Bạn có chắc muốn xóa đơn hàng này?</p>
+  <button id="btn-confirm-yes" class="danger">Xóa</button>
+  <button id="btn-confirm-no" class="secondary">Hủy</button>
+</div></div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const KEY = 'orders_v1';
+  let orders = [], editingId = null, deletingId = null;
+  try { orders = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch(e){ orders = []; }
+
+  const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' ₫';
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(orders)); } catch(e){} };
+  const price = () => { const o = $('product').selectedOptions[0]; return Number(o && o.dataset.price || 0); };
+  const qty = () => { const v = $('quantity').value.trim(); return /^\d+$/.test(v) ? parseInt(v,10) : 0; };
+
+  function updateTotal(){
+    $('unit-price').value = fmt(price());
+    $('total').textContent = fmt(price() * qty());
+  }
+
+  function setErr(field, text){
+    $('err-' + field).textContent = text || '';
+    const el = $(field); if (el) el.classList.toggle('invalid', !!text);
+  }
+
+  function validate(){
+    const name = $('customer-name').value.trim(), phone = $('phone').value.trim(),
+          email = $('email').value.trim(), address = $('address').value.trim(),
+          q = $('quantity').value.trim();
+    const errs = {};
+    if (!name) errs['customer-name'] = 'Vui lòng nhập tên khách hàng';
+    else if (name.length < 2 || name.length > 50) errs['customer-name'] = 'Tên phải từ 2 đến 50 ký tự';
+    if (!phone) errs['phone'] = 'Vui lòng nhập số điện thoại';
+    else if (!/^0\d{9}$/.test(phone)) errs['phone'] = 'Số điện thoại không hợp lệ (10 số, bắt đầu bằng 0)';
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs['email'] = 'Email không hợp lệ';
+    if (!$('product').value) errs['product'] = 'Vui lòng chọn sản phẩm';
+    if (!q) errs['quantity'] = 'Vui lòng nhập số lượng';
+    else if (!/^\d+$/.test(q) || parseInt(q,10) < 1 || parseInt(q,10) > 99) errs['quantity'] = 'Số lượng phải là số nguyên từ 1 đến 99';
+    if (!address) errs['address'] = 'Vui lòng nhập địa chỉ giao hàng';
+    else if (address.length < 5 || address.length > 200) errs['address'] = 'Địa chỉ phải từ 5 đến 200 ký tự';
+    ['customer-name','phone','email','product','quantity','address'].forEach(f => setErr(f, errs[f]));
+    return Object.keys(errs).length === 0;
+  }
+
+  function showMsg(t){ const m = $('msg'); m.textContent = t; m.className = 'ok'; }
+  function hideMsg(){ const m = $('msg'); m.textContent = ''; m.className = ''; }
+
+  function resetForm(){
+    ['customer-name','phone','email','address','note'].forEach(i => $(i).value = '');
+    $('product').value = ''; $('quantity').value = '1'; $('pay-cod').checked = true;
+    ['customer-name','phone','email','product','quantity','address'].forEach(f => setErr(f, ''));
+    editingId = null;
+    $('form-title').textContent = 'Tạo đơn hàng mới';
+    $('btn-submit').textContent = 'Tạo đơn hàng';
+    $('btn-cancel-edit').style.display = 'none';
+    updateTotal();
+  }
+
+  function nextCode(){
+    const max = orders.reduce((m,o) => Math.max(m, parseInt(o.id.slice(2),10)), 0);
+    return 'DH' + String(max + 1).padStart(4, '0');
+  }
+
+  function submit(){
+    hideMsg();
+    if (!validate()) return;
+    const data = {
+      name: $('customer-name').value.trim(), phone: $('phone').value.trim(),
+      email: $('email').value.trim(), product: $('product').value,
+      qty: qty(), total: price() * qty(), address: $('address').value.trim(),
+      payment: document.querySelector('input[name=payment]:checked').value,
+      note: $('note').value.trim()
+    };
+    if (editingId) {
+      const o = orders.find(x => x.id === editingId);
+      Object.assign(o, data); save(); render(); resetForm();
+      showMsg('Cập nhật đơn hàng thành công');
+    } else {
+      orders.push(Object.assign({ id: nextCode(), status: 'Mới' }, data));
+      save(); render(); resetForm();
+      showMsg('Tạo đơn hàng thành công');
+    }
+  }
+
+  function render(){
+    const kw = $('search').value.trim().toLowerCase(), st = $('filter-status').value;
+    const list = orders.filter(o =>
+      (!st || o.status === st) &&
+      (!kw || o.id.toLowerCase().includes(kw) || o.name.toLowerCase().includes(kw) || o.phone.includes(kw)));
+    const tb = document.querySelector('#order-table tbody');
+    tb.innerHTML = '';
+    list.forEach(o => {
+      const tr = document.createElement('tr');
+      tr.dataset.orderId = o.id;
+      const cells = [o.id, o.name, o.phone, o.product, o.qty, fmt(o.total), o.payment];
+      cells.forEach((c, i) => { const td = document.createElement('td'); td.textContent = c;
+        td.className = ['code','name','phone','product','qty','total','payment'][i]; tr.appendChild(td); });
+      const tdS = document.createElement('td');
+      const sel = document.createElement('select'); sel.className = 'status-select';
+      ['Mới','Đang giao','Hoàn thành'].forEach(s => { const op = document.createElement('option'); op.value = op.textContent = s; sel.appendChild(op); });
+      sel.value = o.status;
+      sel.addEventListener('change', () => { o.status = sel.value; save(); render(); });
+      tdS.appendChild(sel); tr.appendChild(tdS);
+      const tdA = document.createElement('td');
+      const be = document.createElement('button'); be.textContent = 'Sửa'; be.className = 'btn-edit';
+      be.addEventListener('click', () => startEdit(o.id));
+      const bd = document.createElement('button'); bd.textContent = 'Xóa'; bd.className = 'btn-delete danger';
+      bd.addEventListener('click', () => { deletingId = o.id; $('confirm-text').textContent = 'Bạn có chắc muốn xóa đơn hàng ' + o.id + '?'; $('confirm-modal').classList.add('open'); });
+      tdA.appendChild(be); tdA.appendChild(document.createTextNode(' ')); tdA.appendChild(bd);
+      tr.appendChild(tdA);
+      tb.appendChild(tr);
+    });
+    $('order-count').textContent = list.length;
+    $('empty-msg').style.display = list.length ? 'none' : 'block';
+    $('empty-msg').textContent = orders.length ? 'Không tìm thấy đơn hàng phù hợp' : 'Chưa có đơn hàng';
+  }
+
+  function startEdit(id){
+    const o = orders.find(x => x.id === id);
+    hideMsg(); editingId = id;
+    $('customer-name').value = o.name; $('phone').value = o.phone; $('email').value = o.email;
+    $('product').value = o.product; $('quantity').value = String(o.qty); $('address').value = o.address;
+    $('note').value = o.note; (o.payment === 'COD' ? $('pay-cod') : $('pay-bank')).checked = true;
+    $('form-title').textContent = 'Sửa đơn hàng ' + id;
+    $('btn-submit').textContent = 'Cập nhật đơn hàng';
+    $('btn-cancel-edit').style.display = 'inline-block';
+    updateTotal(); window.scrollTo(0, 0);
+  }
+
+  $('product').addEventListener('change', updateTotal);
+  $('quantity').addEventListener('input', updateTotal);
+  $('btn-submit').addEventListener('click', submit);
+  $('btn-reset').addEventListener('click', () => { hideMsg(); resetForm(); });
+  $('btn-cancel-edit').addEventListener('click', () => { hideMsg(); resetForm(); });
+  $('search').addEventListener('input', render);
+  $('filter-status').addEventListener('change', render);
+  $('btn-confirm-no').addEventListener('click', () => { deletingId = null; $('confirm-modal').classList.remove('open'); });
+  $('btn-confirm-yes').addEventListener('click', () => {
+    orders = orders.filter(o => o.id !== deletingId); save(); deletingId = null;
+    $('confirm-modal').classList.remove('open'); render();
+  });
+  updateTotal(); render();
+})();
+</script>
+</body>
+</html>
